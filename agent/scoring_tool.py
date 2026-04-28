@@ -1,5 +1,5 @@
+import os
 import boto3
-import json
 import joblib
 import numpy as np
 from dotenv import load_dotenv
@@ -7,10 +7,9 @@ load_dotenv()
 
 from langchain.tools import tool
 
-runtime = boto3.client("sagemaker-runtime", region_name="us-east-2")
-ENDPOINT_NAME = "returnsense-xgb-endpoint"
+runtime = boto3.client("sagemaker-runtime", region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-2"))
+ENDPOINT_NAME = os.getenv("SAGEMAKER_ENDPOINT_NAME", "returnsense-xgb-endpoint")
 
-# Load encoders and feature order
 encoders = joblib.load("model/encoders.joblib")
 FEATURES = joblib.load("model/features.joblib")
 
@@ -33,16 +32,14 @@ def get_risk_tier(prob):
 
 @tool
 def score_order(order_features: dict) -> dict:
-    """Score a user's return risk using the deployed SageMaker XGBoost model.
-    Input should be a dict of order features from lookup_order. Returns probability, risk tier, and explanation."""
+    """Score a user's return risk using the deployed SageMaker XGBoost endpoint.
+    Input should be a dict of order features from lookup_order."""
 
     try:
-        # Encode categoricals
         for col, le in encoders.items():
             if col in order_features:
                 order_features[col] = int(le.transform([str(order_features[col])])[0])
 
-        # Build CSV row in correct feature order
         row = [str(order_features.get(f, 0)) for f in FEATURES]
         payload = ",".join(row)
 
@@ -56,10 +53,7 @@ def score_order(order_features: dict) -> dict:
         tier = get_risk_tier(prob)
         pred = 1 if prob >= 0.5 else 0
 
-        top_factors = [
-            SHAP_CONTEXT[f] for f in SHAP_CONTEXT
-            if f in order_features
-        ][:3]
+        top_factors = [SHAP_CONTEXT[f] for f in SHAP_CONTEXT if f in order_features][:3]
 
         return {
             "probability": round(prob, 4),

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_aws import ChatBedrockConverse
-from langchain.agents import create_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from agent.lookup_tool import lookup_order
@@ -12,7 +12,7 @@ from agent.policy_tool import query_policy
 from agent.product_tool import get_product_policy
 
 llm = ChatBedrockConverse(
-    model=os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-haiku-20241022-v1:0"),
+    model=os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0"),
     region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-2"),
     temperature=0.0
 )
@@ -37,10 +37,10 @@ When scoring an order always:
 4. Reference relevant policy if needed"""
 
 def get_agent_executor():
-    return create_agent(
+    return create_react_agent(
         llm,
         tools=tools,
-        system_prompt=SYSTEM_PROMPT,
+        prompt=SYSTEM_PROMPT,
     )
 
 def run_agent(user_input: str, agent_executor) -> str:

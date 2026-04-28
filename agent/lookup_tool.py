@@ -1,9 +1,33 @@
-import pandas as pd
 import ast
+import os
 import numpy as np
+import pandas as pd
+from databricks import sql
 from langchain.tools import tool
+from dotenv import load_dotenv
+load_dotenv()
 
-df = pd.read_csv("data/version1.csv")
+def load_df():
+    conn = sql.connect(
+        server_hostname=os.getenv("DATABRICKS_HOSTNAME"),
+        http_path=os.getenv("DATABRICKS_HTTP_PATH"),
+        access_token=os.getenv("DATABRICKS_TOKEN"),
+    )
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM read_files(
+            'dbfs:/Volumes/project_2/datalake/landing_zone/test_output/final_report.csv',
+            format => 'csv',
+            header => true
+        )
+    """)
+    rows = cursor.fetchall()
+    cols = [desc[0] for desc in cursor.description]
+    cursor.close()
+    conn.close()
+    return pd.DataFrame(rows, columns=cols)
+
+df = load_df()
 
 def parse_nested_mean(val):
     try:
