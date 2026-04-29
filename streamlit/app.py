@@ -48,7 +48,6 @@ html, body, [class*="css"] {
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding: 1.5rem 2.5rem 0rem 2.5rem; max-width: 100%; }
 
-/* Header */
 .eiq-header {
     display: flex;
     align-items: flex-start;
@@ -76,7 +75,6 @@ html, body, [class*="css"] {
 }
 .eiq-env span { color: #1f6feb; }
 
-/* Tabs */
 .stTabs [data-baseweb="tab-list"] {
     background: transparent;
     border-bottom: 1px solid #1a2332;
@@ -102,7 +100,6 @@ html, body, [class*="css"] {
 }
 .stTabs [data-baseweb="tab-panel"] { padding: 0; }
 
-/* ── Claude-style chat: no boxes, clean messages ── */
 .stChatMessage {
     background: transparent !important;
     border: none !important;
@@ -110,7 +107,6 @@ html, body, [class*="css"] {
     padding: 0.6rem 0 !important;
     margin-bottom: 0 !important;
 }
-/* subtle divider between messages */
 .stChatMessage + .stChatMessage {
     border-top: 1px solid #0d1117 !important;
 }
@@ -119,12 +115,7 @@ html, body, [class*="css"] {
     line-height: 1.8;
     color: #c9d1d9;
 }
-/* user message slightly distinct */
-[data-testid="stChatMessage"][data-testid*="user"] {
-    background: #0d1117 !important;
-}
 
-/* Chat input pinned to bottom */
 .stChatInputContainer {
     position: fixed !important;
     bottom: 0 !important;
@@ -144,10 +135,8 @@ html, body, [class*="css"] {
     padding: 0.75rem 1rem !important;
 }
 
-/* scroll padding so messages don't hide behind fixed input */
 .chat-area { padding-bottom: 110px; padding-top: 1.2rem; }
 
-/* Buttons */
 .stButton button {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.85rem;
@@ -162,7 +151,6 @@ html, body, [class*="css"] {
 }
 .stButton button:hover { color: #58a6ff; background: #1f6feb0d; }
 
-/* Metrics */
 [data-testid="stMetric"] {
     background: #0d1117;
     border: 1px solid #1a2332;
@@ -216,14 +204,13 @@ h2, h3 {
 </style>
 """, unsafe_allow_html=True)
 
-# --- Header ---
 st.markdown(f"""
 <div class="eiq-header">
     <div>
         <div class="eiq-logo">Ecom<span>IQ</span></div>
         <div class="eiq-desc">
             An internal e-commerce business intelligence platform combining a LangChain agent
-            with a deployed XGBoost return-risk model, RAG-based policy retrieval over Pinecone,
+            with a deployed XGBoost chargeback risk model, RAG-based policy retrieval over Pinecone,
             and live retail analytics sourced from a Databricks data lakehouse.
         </div>
     </div>
@@ -241,7 +228,6 @@ def strip_thinking(text: str) -> str:
     return text.strip()
 
 def stream_response(text: str):
-    """Simulate streaming by yielding words with a small delay."""
     for word in text.split(" "):
         yield word + " "
         time.sleep(0.018)
@@ -281,10 +267,10 @@ with tab_agent:
     with col_side:
         st.markdown('<div style="padding-top: 1.2rem;">', unsafe_allow_html=True)
 
-        st.markdown('<div class="sec-label">Sample Users</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-label">Chargeback Risk Lookup</div>', unsafe_allow_html=True)
         for uid in ["7cd4bbb6", "00a077f0", "0173caf3", "019a0581", "02974775"]:
             if st.button(f"↗ {uid}", key=f"uid_{uid}"):
-                prompt = f"Look up user {uid} and score their return risk"
+                prompt = f"Look up user {uid} and score their chargeback risk"
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 with st.spinner(""):
                     raw = run_agent(prompt, st.session_state.agent_executor)
@@ -294,7 +280,7 @@ with tab_agent:
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown('<div class="sec-label">Policy</div>', unsafe_allow_html=True)
-        for q in ["Return window for electronics?", "Manager approval threshold?",
+        for q in ["Return window for electronics?", "Manager approval by category?",
                   "Restocking fee policy?", "Clothing return policy?", "Chargeback dispute process?"]:
             if st.button(q, key=f"pol_{q}"):
                 st.session_state.messages.append({"role": "user", "content": q})
@@ -326,7 +312,6 @@ with tab_agent:
     with col_chat:
         st.markdown('<div class="chat-area">', unsafe_allow_html=True)
 
-        # single unified container — all messages render here in order
         chat_container = st.container()
         with chat_container:
             for msg in st.session_state.messages:
@@ -335,7 +320,7 @@ with tab_agent:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        if prompt := st.chat_input("Enter user ID, policy question, or risk query..."):
+        if prompt := st.chat_input("Enter a user ID to score chargeback risk, or ask a policy question..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with chat_container:
                 with st.chat_message("user"):
@@ -347,6 +332,7 @@ with tab_agent:
                     st.write_stream(stream_response(response))
             st.session_state.messages.append({"role": "assistant", "content": response})
 
+
 # ════════════════════════════════════
 # TAB 2 — ANALYTICS
 # ════════════════════════════════════
@@ -354,7 +340,6 @@ with tab_analytics:
     st.markdown("<div style='padding-top:1.2rem;'>", unsafe_allow_html=True)
     transaction_fact, products_dim, transaction_types_dim, users_dim = load_all_data()
 
-    # numeric safety
     for col in ["total", "lifetime_value", "completed_count", "failed_count",
                 "refund_count", "chargeback_count", "purchase_count",
                 "page_view_count", "search_count", "click_count", "add_to_cart_count"]:
@@ -367,18 +352,17 @@ with tab_analytics:
     failed       = transaction_fact["failed_count"].sum()
     success_rate = (completed / (completed + failed) * 100) if (completed + failed) > 0 else 0
     total_users  = transaction_fact["user_id"].nunique()
-    return_rate  = (transaction_fact["refund_count"].sum() / transaction_fact["purchase_count"].sum() * 100) if transaction_fact["purchase_count"].sum() > 0 else 0
+    chargeback_rate = (transaction_fact["chargeback_count"].sum() / transaction_fact["purchase_count"].sum() * 100) if transaction_fact["purchase_count"].sum() > 0 else 0
 
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Total Revenue",      f"${total_rev:,.0f}")
     m2.metric("Avg Lifetime Value", f"${avg_ltv:,.2f}")
     m3.metric("Success Rate",       f"{success_rate:.1f}%")
     m4.metric("Total Users",        f"{total_users:,}")
-    m5.metric("Return Rate",        f"{return_rate:.1f}%")
+    m5.metric("Chargeback Rate",    f"{chargeback_rate:.1f}%")
 
     st.divider()
 
-    # Row 1
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Revenue by Category")
@@ -399,7 +383,6 @@ with tab_analytics:
 
     st.divider()
 
-    # Row 2
     col3, col4 = st.columns(2)
     with col3:
         st.subheader("Chargeback Rate by Category")
@@ -432,7 +415,6 @@ with tab_analytics:
 
     st.divider()
 
-    # Row 3
     col5, col6 = st.columns(2)
     with col5:
         st.subheader("User Engagement Funnel")

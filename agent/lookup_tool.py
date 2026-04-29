@@ -14,6 +14,12 @@ def get_connection():
     )
 
 def parse_nested_mean(val):
+    """Parse nested list strings or plain floats into a mean value."""
+    try:
+        # try as a plain float first (total column)
+        return float(val)
+    except (ValueError, TypeError):
+        pass
     try:
         parsed = ast.literal_eval(str(val))
         flat = []
@@ -28,8 +34,8 @@ def parse_nested_mean(val):
 
 @tool
 def lookup_order(user_id: str) -> dict:
-    """Look up a user's order features by user_id from the e-commerce dataset.
-    Returns the feature row needed for scoring."""
+    """Look up a user's behavioral features by user_id from the e-commerce dataset.
+    Returns the feature row needed for chargeback risk scoring."""
 
     try:
         conn = get_connection()
@@ -76,7 +82,7 @@ def lookup_order(user_id: str) -> dict:
             "search_count": safe_int(row.get("search_count", 0)),
             "login_count": safe_int(row.get("login_count", 0)),
             "logout_count": safe_int(row.get("logout_count", 0)),
-            "total": parse_nested_mean(row.get("total", "[]")),
+            "total": parse_nested_mean(row.get("total", 0)),
             "quantity": parse_nested_mean(row.get("quantity", "[]")),
             "unit_price": parse_nested_mean(row.get("unit_price", "[]")),
         }

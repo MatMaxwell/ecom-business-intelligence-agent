@@ -13,14 +13,14 @@ ENDPOINT_NAME = os.getenv("SAGEMAKER_ENDPOINT_NAME", "returnsense-xgb-endpoint")
 encoders = joblib.load("model/encoders.joblib")
 FEATURES = joblib.load("model/features.joblib")
 
-# Population benchmarks for contextualizing user values
+# population benchmarks from training data (247k transactions, 11k users)
 BENCHMARKS = {
-    "avg_transaction_cost": 847.0,
-    "chargeback_count":     2.1,
-    "purchase_count":       150.0,  # updated — aggregated user-level count
-    "total":                1200.0,
-    "unit_price":           220.0,
-    "quantity":             3.0,
+    "avg_transaction_cost": 950.0,
+    "chargeback_count":     0.73,
+    "purchase_count":       22.5,
+    "total":                3500.0,
+    "unit_price":           250.0,
+    "quantity":             3.5,
 }
 
 def get_risk_tier(prob):
@@ -32,7 +32,7 @@ def get_risk_tier(prob):
         return "Low Risk"
 
 def build_explanation(order_features: dict) -> list:
-    """Generate specific, data-driven risk factor explanations for this user."""
+    """Generate specific, data-driven chargeback risk explanations."""
     explanations = []
 
     cb = order_features.get("chargeback_count", 0)
@@ -47,8 +47,8 @@ def build_explanation(order_features: dict) -> list:
     atc_bench = BENCHMARKS["avg_transaction_cost"]
     if atc > atc_bench:
         explanations.append(
-            f"Average transaction cost of \\${atc:,.2f} is above the \\${atc_bench:,.0f} average — "
-            f"higher spend correlates with higher return likelihood"
+            f"Average transaction cost of ${atc:,.2f} is above the ${atc_bench:,.0f} average — "
+            f"higher spend correlates with higher chargeback likelihood"
         )
 
     pc = order_features.get("purchase_count", 0)
@@ -56,7 +56,7 @@ def build_explanation(order_features: dict) -> list:
     if pc > pc_bench * 1.5:
         explanations.append(
             f"Purchase count of {pc} is {pc/pc_bench:.1f}x the average ({pc_bench:.0f}) — "
-            f"high activity increases return exposure"
+            f"high activity increases chargeback exposure"
         )
 
     total = order_features.get("total", 0)
@@ -64,7 +64,7 @@ def build_explanation(order_features: dict) -> list:
     if total > total_bench:
         explanations.append(
             f"Total order value of ${total:,.2f} exceeds the ${total_bench:,.0f} average — "
-            f"higher order value increases return risk"
+            f"higher order value increases chargeback risk"
         )
 
     up = order_features.get("unit_price", 0)
@@ -72,7 +72,7 @@ def build_explanation(order_features: dict) -> list:
     if up > up_bench:
         explanations.append(
             f"Average unit price of ${up:,.2f} is above the ${up_bench:,.0f} average — "
-            f"expensive items are returned more frequently"
+            f"expensive items are disputed more frequently"
         )
 
     qty = order_features.get("quantity", 0)
@@ -80,10 +80,9 @@ def build_explanation(order_features: dict) -> list:
     if qty > qty_bench:
         explanations.append(
             f"Average quantity per order of {qty:.1f} exceeds the {qty_bench:.1f} average — "
-            f"bulk purchases correlate with higher return likelihood"
+            f"bulk purchases correlate with higher chargeback likelihood"
         )
 
-    # fallback if nothing is elevated
     if not explanations:
         explanations.append(
             f"Chargeback count: {cb}, avg transaction cost: ${atc:,.2f}, "
@@ -95,8 +94,8 @@ def build_explanation(order_features: dict) -> list:
 
 @tool
 def score_order(order_features: dict) -> dict:
-    """Score a user's return risk using the deployed SageMaker XGBoost endpoint.
-    Input should be a dict of order features from lookup_order."""
+    """Score a user's chargeback risk using the deployed SageMaker XGBoost endpoint.
+    Input should be a dict of behavioral features from lookup_order."""
 
     try:
         features_copy = dict(order_features)
@@ -122,10 +121,10 @@ def score_order(order_features: dict) -> dict:
 
         return {
             "user_id": order_features.get("user_id", "unknown"),
-            "probability": round(prob, 4),
+            "chargeback_risk_probability": round(prob, 4),
             "prediction": pred,
             "risk_tier": tier,
-            "label": "RETURN LIKELY" if pred == 1 else "RETURN UNLIKELY",
+            "label": "CHARGEBACK RISK: HIGH" if pred == 1 else "CHARGEBACK RISK: LOW",
             "top_factors": explanations,
             "user_snapshot": {
                 "chargeback_count": order_features.get("chargeback_count"),
@@ -135,7 +134,7 @@ def score_order(order_features: dict) -> dict:
                 "favorite_device": order_features.get("favorite_device"),
             },
             "suggested_action": (
-                "Flag for manager review before processing any refund"
+                "Flag for manager review — high chargeback risk customer"
                 if tier == "High Risk"
                 else "Standard processing applies"
             )
