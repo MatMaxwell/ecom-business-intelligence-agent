@@ -42,7 +42,7 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
     background-color: #010409;
-    color: #c9d1d9;
+    color: #ffffff;
 }
 .stApp { background-color: #010409; }
 #MainMenu, footer, header { visibility: hidden; }
@@ -60,20 +60,20 @@ html, body, [class*="css"] {
     font-family: 'Space Mono', monospace;
     font-size: 1.6rem;
     font-weight: 700;
-    color: #e6edf3;
+    color: #ffffff;
     letter-spacing: -0.02em;
     margin-bottom: 0.3rem;
 }
-.eiq-logo span { color: #1f6feb; }
-.eiq-desc { font-size: 0.9rem; color: #8b949e; max-width: 600px; line-height: 1.5; }
+.eiq-logo span { color: #4d9fff; }
+.eiq-desc { font-size: 0.9rem; color: #e6edf3; max-width: 600px; line-height: 1.5; }
 .eiq-env {
     font-family: 'Space Mono', monospace;
     font-size: 0.7rem;
-    color: #484f58;
+    color: #8b949e;
     text-align: right;
     line-height: 1.8;
 }
-.eiq-env span { color: #1f6feb; }
+.eiq-env span { color: #4d9fff; }
 
 .stTabs [data-baseweb="tab-list"] {
     background: transparent;
@@ -87,15 +87,15 @@ html, body, [class*="css"] {
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #484f58;
+    color: #8b949e;
     background: transparent;
     border: none;
     padding: 0.9rem 2rem;
     border-bottom: 2px solid transparent;
 }
 .stTabs [aria-selected="true"] {
-    color: #1f6feb !important;
-    border-bottom: 2px solid #1f6feb !important;
+    color: #4d9fff !important;
+    border-bottom: 2px solid #4d9fff !important;
     background: transparent !important;
 }
 .stTabs [data-baseweb="tab-panel"] { padding: 0; }
@@ -113,7 +113,7 @@ html, body, [class*="css"] {
 [data-testid="stChatMessageContent"] {
     font-size: 0.95rem;
     line-height: 1.8;
-    color: #c9d1d9;
+    color: #ffffff;
 }
 
 .stChatInputContainer {
@@ -130,7 +130,7 @@ html, body, [class*="css"] {
     background: #0d1117 !important;
     border: 1px solid #21262d !important;
     border-radius: 8px !important;
-    color: #c9d1d9 !important;
+    color: #ffffff !important;
     font-size: 0.95rem !important;
     padding: 0.75rem 1rem !important;
 }
@@ -141,7 +141,7 @@ html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.85rem;
     background: transparent;
-    color: #8b949e;
+    color: #e6edf3;
     border: none;
     border-radius: 4px;
     padding: 0.4rem 0.6rem;
@@ -149,7 +149,7 @@ html, body, [class*="css"] {
     text-align: left;
     transition: all 0.12s ease;
 }
-.stButton button:hover { color: #58a6ff; background: #1f6feb0d; }
+.stButton button:hover { color: #4d9fff; background: #1f6feb1a; }
 
 [data-testid="stMetric"] {
     background: #0d1117;
@@ -171,20 +171,20 @@ html, body, [class*="css"] {
     font-size: 0.7rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #484f58;
+    color: #c9d1d9;
 }
 [data-testid="stMetricValue"] {
     font-family: 'Space Mono', monospace;
     font-size: 1.6rem;
     font-weight: 700;
-    color: #e6edf3;
+    color: #ffffff;
 }
 
 h2, h3 {
     font-family: 'Space Mono', monospace !important;
     font-size: 1rem !important;
     font-weight: 700 !important;
-    color: #e6edf3 !important;
+    color: #ffffff !important;
     letter-spacing: 0.03em !important;
 }
 
@@ -193,7 +193,7 @@ h2, h3 {
     font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #30363d;
+    color: #8b949e;
     margin-bottom: 0.5rem;
     padding-bottom: 0.3rem;
     border-bottom: 1px solid #1a2332;
