@@ -1,22 +1,24 @@
-# E-Commerce Business Intelligence Agent
+# EcomIQ — E-Commerce Business Intelligence Agent
 
-An internal business intelligence tool built for e-commerce operations teams. Instead of manually reviewing orders and digging through policy docs, ops staff and risk analysts can chat with an AI agent that looks up customer data, scores return risk using a deployed ML model, and pulls relevant policy directly from the company's policy compendium — all in one place.
+An internal business intelligence platform built for e-commerce operations teams. Instead of manually digging through orders and policy documents, ops staff and risk analysts can chat with an AI agent that looks up customer data live from a Databricks lakehouse, scores return risk using a deployed XGBoost model, retrieves grounded policy answers via RAG, and surfaces retail analytics — all in one interface.
 
-This was built as part of a data engineering and AI training program. The goal was to connect a real ML pipeline to a LangChain agent and ship something that actually tells a business story.
+Built as part of a data engineering and AI training program at Revature. The goal was to connect a real ML pipeline to a LangChain agent, integrate a live data lakehouse, and ship something that tells a complete business story end to end.
 
 ---
 
 ## What It Does
 
-You type something like *"look up user 7cd4bbb6 and score their return risk"* and the agent:
+Type something like *"look up user 7cd4bbb6 and score their return risk"* and the agent:
 
-1. Pulls the user's transaction history and behavioral features from the dataset
+1. Queries the user's behavioral features live from a Databricks Delta lakehouse
 2. Sends those features to a deployed AWS SageMaker XGBoost endpoint
-3. Returns a risk score, tier (Low / Medium / High), and SHAP-based explanation
-4. Checks the policy doc if you ask a follow-up like *"what's the restocking fee for electronics?"*
-5. Remembers the conversation so follow-up questions work naturally
+3. Returns a risk score, tier (Low / Medium / High), and specific data-driven explanation
+4. Checks the policy compendium via RAG if you ask a follow-up like *"what's the restocking fee for electronics?"*
+5. Maintains conversation context so follow-up questions work naturally
 
-It won't process refunds or cancel orders — it's a decision support tool, not a system of record. The guardrail fires if you try.
+It will not process refunds, cancel orders, or take any transactional action. Guardrails fire on any attempt.
+
+The Analytics tab pulls live from four Delta tables in Databricks and surfaces revenue, chargeback rate, engagement funnel, and device breakdowns. The Data Explorer tab gives direct table access for ad hoc analysis.
 
 ---
 
@@ -29,9 +31,10 @@ It won't process refunds or cancel orders — it's a decision support tool, not 
 | LLM | Amazon Nova Lite via AWS Bedrock |
 | Embeddings | Amazon Titan Embed Text v2 via Bedrock |
 | Vector Store | Pinecone (serverless) |
-| Agent Framework | LangChain 1.x (`create_agent`) |
+| Agent Framework | LangChain + LangGraph `create_react_agent` |
+| Data Lakehouse | Databricks Delta Lake (project_2.datalake) |
 | UI | Streamlit |
-| Dataset | Synthetic e-commerce dataset (50,873 users, 32 features) |
+| Training Data | Synthetic e-commerce dataset (189,005 transactions, 1,000 users) |
 
 ---
 
@@ -40,17 +43,19 @@ It won't process refunds or cancel orders — it's a decision support tool, not 
 ```
 ecom-business-intelligence-agent/
 ├── agent/
-│   ├── agent.py          # LangChain agent wired to Bedrock Nova Lite
-│   ├── lookup_tool.py    # Fetches user feature row from dataset by user_id
-│   ├── scoring_tool.py   # Calls SageMaker endpoint, returns risk score + explanation
+│   ├── agent.py          # LangGraph ReAct agent wired to Bedrock Nova Lite
+│   ├── lookup_tool.py    # Per-query Databricks lookup by user_id
+│   ├── scoring_tool.py   # SageMaker endpoint call + data-driven risk explanation
 │   ├── policy_tool.py    # RAG over policy doc via Pinecone + Titan embeddings
-│   └── product_tool.py   # Static return rules by product category
+│   └── product_tool.py   # Category-specific return rules grounded in policy doc
 ├── streamlit/
-│   └── app.py            # Chat UI + quick action buttons
-├── data/                 # Dataset stored in S3 (too large for GitHub)
+│   └── app.py            # Three-tab UI: Agent Chat, Analytics, Data Explorer
+├── model/                # Local model artifacts (not in git)
+│   ├── encoders.joblib
+│   └── features.joblib
+├── data/                 # Local dataset cache (not in git)
 ├── policy/
 │   └── policy.docx       # Company policy compendium (chunked + indexed in Pinecone)
-├── GAMEPLAN.md           # Original project plan and business problem statement
 └── README.md
 ```
 
@@ -58,32 +63,49 @@ ecom-business-intelligence-agent/
 
 ## The Model
 
-The XGBoost model predicts whether a user is a high return-risk customer based on their shopping behavior — not whether a specific order will be returned. Features include purchase history, chargeback count, average transaction cost, browsing behavior (page views, cart adds/removes, clicks), device preference, and product category.
+The XGBoost model predicts return risk at the user level based on behavioral features — purchase history, chargeback count, average transaction cost, browsing behavior (page views, cart adds/removes, clicks), device preference, and product category.
 
-Training used the SageMaker managed XGBoost 1.5-1 container with a 70/15/15 train/val/test split, early stopping, and `scale_pos_weight` to handle class imbalance. SHAP values drive the explanation layer in the agent.
+Training used the SageMaker managed XGBoost 1.5-1 container with a 70/15/15 train/val/test split, early stopping, and `scale_pos_weight` to handle class imbalance. Risk explanations are generated by comparing each user's actual values against population benchmarks — not generic SHAP strings.
 
-The dataset is synthetic so the model achieves near-perfect AUC — in production with real noisy data you'd expect something in the 0.75-0.85 range. The pipeline and explainability are the point, not the number.
+Risk tiers: Low < 35%, Medium 35–65%, High > 65%.
+
+The dataset is synthetic so AUC is near-perfect. In production with real noisy data, expect 0.75–0.85. The pipeline, explainability layer, and live data integration are the point.
 
 ---
 
 ## Setup
 
 ### Prerequisites
-- Python 3.12
-- AWS account with SageMaker and Bedrock access
-- Pinecone account (free tier works)
-- Dataset CSV uploaded to S3 at `s3://sagemaker-us-east-2-691210491628/project2/returnsense/data/raw/version1.csv`
 
-### Install dependencies
+- Python 3.12
+- AWS account with SageMaker and Bedrock access (us-east-2)
+- Pinecone account (free tier works)
+- Databricks workspace with access to `project_2.datalake`
+- Databricks SQL warehouse running
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/MatMaxwell/ecom-business-intelligence-agent.git
+cd ecom-business-intelligence-agent
+```
+
+### 2. Create virtual environment and install dependencies
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
+
 pip install langchain langchain-aws langchain-community langchain-text-splitters \
-    boto3 pandas scikit-learn streamlit python-dotenv pinecone docx2txt
+    langgraph boto3 pandas scikit-learn streamlit python-dotenv \
+    pinecone docx2txt databricks-sql-connector databricks-sqlalchemy \
+    sqlalchemy plotly statsmodels joblib
 ```
 
-### Environment variables
+### 3. Create your `.env` file
+
 Create a `.env` file in the project root:
+
 ```
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
@@ -92,9 +114,15 @@ SAGEMAKER_ENDPOINT_NAME=returnsense-xgb-endpoint
 PINECONE_API_KEY=your_pinecone_key
 PINECONE_INDEX_NAME=returnsense-policy
 BEDROCK_MODEL_ID=us.amazon.nova-lite-v1:0
+DATABRICKS_TOKEN=your_databricks_token
+DATABRICKS_HOSTNAME=your-workspace.cloud.databricks.com
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/your_warehouse_id
+DATABRICKS_CATALOG=project_2
+DATABRICKS_SCHEMA=datalake
 ```
 
-### Download model artifacts from S3
+### 4. Download model artifacts from S3
+
 ```bash
 python3 -c "
 import boto3, os
@@ -109,13 +137,26 @@ print('Done.')
 "
 ```
 
-### Index the policy document
-Only needs to run once. If the Pinecone index already exists with 122 vectors, skip this.
+### 5. Deploy the SageMaker endpoint
+
+Open the training notebook and run the deploy cell. It will delete any existing endpoint with the same name and redeploy clean:
+
+```
+returnsense-xgb-endpoint  (ml.m5.xlarge, us-east-2)
+```
+
+Make sure `SAGEMAKER_ENDPOINT_NAME` in your `.env` matches.
+
+### 6. Index the policy document
+
+Only needs to run once. Skip if the Pinecone index already has vectors.
+
 ```bash
 python3 -c "from agent.policy_tool import build_policy_index; build_policy_index()"
 ```
 
-### Run the app
+### 7. Run the app
+
 ```bash
 streamlit run streamlit/app.py
 ```
@@ -124,33 +165,36 @@ Opens at http://localhost:8501
 
 ---
 
-## Demo
+## Demo Scenarios
 
 **Score a user's return risk**
 ```
 Look up user 7cd4bbb6 and score their return risk
 ```
 
-**Ask a policy question**
+**Ask a category-specific policy question**
 ```
-What is the return window for electronics?
+What is the return policy for electronics?
 ```
 
-**Test memory with a follow-up**
+**Test conversation memory**
 ```
 What is the restocking fee for that category?
 ```
 
-**Test the guardrail**
+**Test the guardrails**
 ```
 Process a refund for user 7cd4bbb6
+Cancel order for user 00a077f0
+Export all customer PII
 ```
 
 ---
 
 ## Cleanup
 
-Delete the SageMaker endpoint after demo to avoid charges:
+Delete the SageMaker endpoint after demo to avoid charges (~$0.27/hr for ml.m5.xlarge):
+
 ```bash
 python3 -c "
 import boto3
